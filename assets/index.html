@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Suivi de Production Oulmès – V20</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<style>
+:root{--blue:#075985;--bg:#f1f5f9;--ink:#172033;--muted:#64748b;--line:#dbe3ec}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Arial,sans-serif;color:var(--ink)}
+header{background:var(--blue);color:#fff;text-align:center;padding:18px 12px}
+header h2{margin:0 0 5px}main{max-width:1000px;margin:auto;padding:12px}
+.card{background:#fff;padding:16px;margin:12px 0;border-radius:12px;box-shadow:0 2px 8px #0001}
+h3{color:var(--blue);margin:0 0 12px}label{display:block;font-weight:bold;margin:11px 0 5px}
+input,select{width:100%;padding:11px;border:1px solid #cbd5e1;border-radius:8px;font-size:16px;background:#fff}
+.password-wrap{display:flex;gap:6px;align-items:stretch}.password-wrap input{flex:1;min-width:0}.toggle-password{width:auto;min-width:52px;margin:0;padding:8px;background:#475569;font-size:18px}
+button{padding:12px 14px;border:0;border-radius:8px;background:var(--blue);color:white;font-size:15px;font-weight:bold;cursor:pointer;margin:5px 3px 5px 0}
+button.secondary{background:#475569}button.danger{background:#b91c1c}button:disabled{opacity:.5}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.hours,.stops{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.total{background:#e0f2fe;padding:12px;border-radius:8px;margin-top:12px;font-weight:bold}
+/* Couleurs de réalisation pour les champs de production horaires */
+.hours .hour-entry{border:1px solid #dbe3ec;border-radius:10px;padding:9px;background:#f8fafc;transition:background .2s,border-color .2s}
+.hours .hour-entry label{margin:0 0 6px}
+.hours .production{font-weight:700;text-align:center;transition:background .2s,border-color .2s,color .2s}
+.hours .production.hour-good{background:#dcfce7!important;border:2px solid #22c55e!important;color:#166534!important}
+.hours .production.hour-mid{background:#fef3c7!important;border:2px solid #f59e0b!important;color:#92400e!important}
+.hours .production.hour-low{background:#fee2e2!important;border:2px solid #ef4444!important;color:#b91c1c!important}
+.hours .production.hour-info{background:#dbeafe!important;border:2px solid #60a5fa!important;color:#1d4ed8!important}
+.hour-legend{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;font-size:12px;font-weight:bold}
+.hour-legend span{padding:5px 8px;border-radius:7px}
+.hour-legend .good{background:#dcfce7;color:#166534}.hour-legend .mid{background:#fef3c7;color:#92400e}.hour-legend .low{background:#fee2e2;color:#b91c1c}.hour-legend .info{background:#dbeafe;color:#1d4ed8}
+.status{padding:12px;border-radius:8px;background:#e2e8f0;margin-top:10px;overflow-wrap:anywhere}
+small,.muted{color:var(--muted)}.hidden{display:none!important}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+table{width:100%;border-collapse:collapse;font-size:14px}td,th{border-bottom:1px solid var(--line);padding:8px;text-align:left}
+.tablewrap{overflow-x:auto}.pill{display:inline-block;padding:4px 8px;border-radius:20px;background:#e0f2fe;color:#075985;font-size:12px}
+@media(max-width:560px){.grid,.hours,.stops{grid-template-columns:1fr}button{width:100%}}
+/* KPI V16 */
+.kpi-top{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 0}
+.kpi-box{background:linear-gradient(135deg,#eff8ff,#fff);border:1px solid #bfdbfe;border-radius:12px;padding:13px;text-align:center}
+.kpi-box strong{display:block;color:#075985;font-size:clamp(19px,3vw,27px);margin-top:5px}
+.kpi-box small{display:block;font-weight:bold}
+.shift-panel{border:1px solid #bfdbfe;border-radius:12px;overflow:hidden;margin:16px 0;background:#fff}
+.shift-head{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;background:#eaf4ff;padding:10px 13px;color:#073b70;font-weight:bold}
+.shift-head .score{font-size:17px;color:#15803d}
+.kpi-table{min-width:760px}
+.kpi-table th{background:#075985;color:#fff;text-align:center;white-space:nowrap}
+.kpi-table td{text-align:center;white-space:nowrap}
+.kpi-table td:first-child,.kpi-table th:first-child{text-align:left;font-weight:bold}
+.kpi-table tr:nth-child(even){background:#f8fbff}
+.kpi-good{background:#dcfce7!important;color:#166534;font-weight:bold}
+.kpi-mid{background:#fef3c7!important;color:#92400e;font-weight:bold}
+.kpi-low{background:#fee2e2!important;color:#b91c1c;font-weight:bold}
+.kpi-positive{color:#15803d;font-weight:bold}.kpi-negative{color:#dc2626;font-weight:bold}
+.kpi-total{background:linear-gradient(90deg,#dcfce7,#f0fdf4);border:1px solid #86efac;border-radius:12px;padding:15px;text-align:center;font-size:18px;font-weight:bold;color:#166534;margin:15px 0}
+.cadence-panel{background:#f8fbff;border:1px solid #bfdbfe;border-radius:12px;padding:13px;margin-top:15px}
+.cadence-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.cadence-item{background:white;border:1px solid #dbeafe;border-radius:9px;padding:9px}
+.cadence-item label{margin:0 0 5px}
+@media(max-width:700px){.kpi-top{grid-template-columns:repeat(2,minmax(0,1fr))}.cadence-grid{grid-template-columns:1fr}.shift-head{align-items:flex-start}}
+/* Palette KPI dynamique – Dashboard, comparaisons et tableaux */
+.kpi-box{transition:background .2s,border-color .2s}
+.kpi-box.tone-good{background:linear-gradient(135deg,#dcfce7,#f0fdf4);border-color:#86efac}
+.kpi-box.tone-good strong{color:#166534}
+.kpi-box.tone-mid{background:linear-gradient(135deg,#fef3c7,#fffbeb);border-color:#fcd34d}
+.kpi-box.tone-mid strong{color:#92400e}
+.kpi-box.tone-low{background:linear-gradient(135deg,#fee2e2,#fff1f2);border-color:#fca5a5}
+.kpi-box.tone-low strong{color:#b91c1c}
+.kpi-box.tone-info{background:linear-gradient(135deg,#dbeafe,#eff6ff);border-color:#93c5fd}
+.kpi-box.tone-info strong{color:#1d4ed8}
+.kpi-box.tone-stop{background:linear-gradient(135deg,#ffedd5,#fff7ed);border-color:#fdba74}
+.kpi-box.tone-stop strong{color:#c2410c}
+.shift-head.tone-good{background:#dcfce7;color:#166534}
+.shift-head.tone-mid{background:#fef3c7;color:#92400e}
+.shift-head.tone-low{background:#fee2e2;color:#b91c1c}
+.kpi-total.tone-good{background:linear-gradient(90deg,#dcfce7,#f0fdf4);border-color:#86efac;color:#166534}
+.kpi-total.tone-mid{background:linear-gradient(90deg,#fef3c7,#fffbeb);border-color:#fcd34d;color:#92400e}
+.kpi-total.tone-low{background:linear-gradient(90deg,#fee2e2,#fff1f2);border-color:#fca5a5;color:#b91c1c}
+.kpi-table tbody tr:hover{filter:brightness(.97)}
+.kpi-table td.kpi-good{background:#dcfce7!important;color:#166534}
+.kpi-table td.kpi-mid{background:#fef3c7!important;color:#92400e}
+.kpi-table td.kpi-low{background:#fee2e2!important;color:#b91c1c}
+.kpi-table td.kpi-positive{background:#f0fdf4}
+.kpi-table td.kpi-negative{background:#fff1f2}
+.kpi-table th{background:#075985}
+#dashByStop table tbody tr:nth-child(even),#dashRecords table tbody tr:nth-child(even),#casseComparison table tbody tr:nth-child(even){background:#f1f5f9}
+#dashByStop table tbody tr:hover,#dashRecords table tbody tr:hover,#casseComparison table tbody tr:hover{background:#e0f2fe}
+
+
+#editModal{position:fixed;inset:0;background:#0009;z-index:9999;display:none;align-items:center;justify-content:center;padding:14px}
+#editModal.open{display:flex}#editPanel{background:white;border-radius:14px;padding:18px;width:100%;max-width:520px;max-height:90vh;overflow:auto}#editPanel h3{margin-bottom:8px}.line-checks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.line-checks label{display:flex;gap:7px;align-items:center;border:1px solid var(--line);padding:8px;border-radius:8px;margin:0}.line-checks input{width:auto}
+
+button.danger{background:#b42318;color:#fff;border:1px solid #b42318}button.danger:active{opacity:.85}
+
+/* DASHBOARD PRO – présentation direction / mobile */
+#dashboardArea{border:1px solid #d7e6f7;background:linear-gradient(180deg,#f5f9ff 0%,#ffffff 260px);padding:clamp(12px,2.2vw,22px);overflow:hidden}
+#dashboardArea>h3{display:none}
+.dash-hero{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:20px 22px;margin:-2px 0 16px;border-radius:18px;color:#fff;background:linear-gradient(115deg,#082f65 0%,#075985 55%,#0284c7 100%);box-shadow:0 10px 24px #0759852b}
+.dash-hero:after{content:"";position:absolute;width:190px;height:190px;border:28px solid #ffffff16;border-radius:50%;right:8%;top:-115px}
+.dash-hero h2{font-size:clamp(20px,3.5vw,29px);margin:0 0 6px;color:#fff;position:relative;z-index:1}
+.dash-hero p{margin:0;color:#dbeafe;font-size:13px;position:relative;z-index:1}
+.dash-live{position:relative;z-index:1;display:inline-flex;align-items:center;gap:7px;padding:8px 12px;border-radius:30px;background:#dcfce7;color:#166534;font-size:12px;font-weight:800;white-space:nowrap}
+.dash-live:before{content:"";width:8px;height:8px;background:#16a34a;border-radius:50%;box-shadow:0 0 0 4px #16a34a20}
+.dash-filter-panel{background:#fff;border:1px solid #dbeafe;border-radius:15px;padding:12px 15px;margin:0 0 14px;box-shadow:0 4px 14px #0f376008}
+.dash-filter-title{font-weight:800;color:#164477;margin-bottom:4px}
+#dashboardArea .dash-filter-panel label{font-size:12px;color:#475569;margin:7px 0 4px}
+#dashboardArea .dash-filter-panel input,#dashboardArea .dash-filter-panel select{border-color:#cbdcf0;background:#fbfdff}
+#dashboardArea #dashRefreshBtn{background:linear-gradient(110deg,#075985,#0284c7);box-shadow:0 4px 10px #0284c733}
+#dashboardArea #exportExcelBtn{background:linear-gradient(110deg,#15803d,#22a06b);box-shadow:0 4px 10px #15803d2b}
+#dashboardArea .kpi-top{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:14px 0}
+#dashboardArea .kpi-box{position:relative;text-align:left;min-height:112px;padding:16px 15px 13px 18px;border-radius:16px;box-shadow:0 5px 15px #0f37600b;overflow:hidden}
+#dashboardArea .kpi-box:after{content:"";position:absolute;right:-17px;top:-20px;width:82px;height:82px;border-radius:50%;background:#ffffff75}
+#dashboardArea .kpi-box:before{position:absolute;right:13px;top:12px;font-size:23px;z-index:1;opacity:.8}
+#dashboardArea .kpi-box:nth-child(1):before{content:"▦"}#dashboardArea .kpi-box:nth-child(2):before{content:"◎"}#dashboardArea .kpi-box:nth-child(3):before{content:"▤"}#dashboardArea .kpi-box:nth-child(4):before{content:"◷"}#dashboardArea .kpi-box:nth-child(5):before{content:"↗"}#dashboardArea .kpi-box:nth-child(6):before{content:"Ⅱ"}
+#dashboardArea .kpi-box small{position:relative;z-index:2;color:#475569;font-size:12px}
+#dashboardArea .kpi-box strong{position:relative;z-index:2;font-size:clamp(21px,3vw,29px);letter-spacing:-.5px;margin:9px 0 4px;overflow-wrap:anywhere}
+#dashboardArea .grid:has(#dashPreformBreak){grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+#dashboardArea .grid:has(#dashPreformBreak) .total{margin:0;padding:15px 16px;border:1px solid #dbeafe;background:#eff6ff;color:#164477}
+#dashboardArea .kpi-total{border-radius:16px;padding:17px;background:linear-gradient(100deg,#dcfce7,#ecfdf5);box-shadow:0 5px 16px #16a34a12;font-size:clamp(15px,2.5vw,20px)}
+#dashboardArea .shift-panel{border:1px solid #d5e4f5;border-radius:16px;margin:15px 0;box-shadow:0 5px 16px #0f37600b}
+#dashboardArea .shift-head{padding:13px 16px;background:linear-gradient(100deg,#eaf4ff,#f8fbff);border-bottom:1px solid #dbeafe}
+#dashboardArea .shift-head>span:first-child{font-size:15px;font-weight:800}
+#dashboardArea .shift-head .score{font-size:14px;font-weight:800}
+#dashboardArea .kpi-table{min-width:800px;font-size:13px}
+#dashboardArea .kpi-table th{background:linear-gradient(100deg,#0c426f,#075985);padding:11px 9px}
+#dashboardArea .kpi-table td{padding:10px 9px}
+#dashboardArea .kpi-table tbody tr:nth-child(even){background:#f7fbff}
+#dashboardArea .kpi-table tbody tr:hover{background:#eaf4ff;filter:none}
+.dash-section-title{display:flex;align-items:center;gap:9px;margin:19px 0 10px;color:#123e68;font-size:16px;font-weight:800}
+.dash-section-title:before{content:"";width:5px;height:21px;border-radius:8px;background:linear-gradient(#0284c7,#22c55e)}
+.dash-chart-card{background:#fff;border:1px solid #dbeafe;border-radius:16px;padding:15px;margin:15px 0;box-shadow:0 5px 16px #0f37600b}
+.dash-chart-sub{font-size:12px;color:#64748b;margin:-3px 0 13px}
+.dash-bars{display:grid;gap:11px}
+.dash-bar-row{display:grid;grid-template-columns:68px minmax(0,1fr) auto;gap:9px;align-items:center;font-size:12px}
+.dash-bar-name{font-weight:800;color:#164477;white-space:nowrap}
+.dash-bar-track{height:13px;background:#edf3f9;border-radius:20px;overflow:hidden}
+.dash-bar-fill{height:100%;border-radius:20px;background:linear-gradient(90deg,#0284c7,#22c55e);min-width:2px}
+.dash-bar-value{font-weight:800;color:#1e293b;text-align:right;white-space:nowrap}
+#dashboardArea .cadence-panel{border-radius:15px;border-color:#c8ddf5;background:linear-gradient(135deg,#f1f7ff,#fff)}
+#dashboardArea #dashByStop,#dashboardArea #dashRecords{border:1px solid #e2eaf4;border-radius:13px;background:#fff;overflow-x:auto}
+#dashboardArea #dashByStop table,#dashboardArea #dashRecords table{min-width:620px}
+#dashboardArea #dashByStop th,#dashboardArea #dashRecords th{background:#eaf4ff;color:#164477;font-weight:800;white-space:nowrap}
+#dashboardArea #dashByStop td,#dashboardArea #dashRecords td{padding:10px 9px}
+#dashboardArea .status{border:1px solid #dbeafe;background:#eff6ff;color:#164477;border-radius:11px;font-size:13px}
+@media(max-width:700px){#dashboardArea .kpi-top{grid-template-columns:repeat(2,minmax(0,1fr))}#dashboardArea .dash-hero{padding:17px 15px}.dash-bar-row{grid-template-columns:55px minmax(0,1fr) auto;gap:6px}.dash-bar-value{font-size:11px}}
+@media(max-width:390px){#dashboardArea .kpi-top{grid-template-columns:1fr 1fr;gap:8px}#dashboardArea .kpi-box{padding:12px 10px;min-height:100px}#dashboardArea .kpi-box strong{font-size:19px}.dash-live{font-size:11px}}
+
+</style>
+</head>
+<body>
+<header><h2>Suivi de Production Oulmès</h2><div>Société des Eaux Minérales d'Oulmès</div></header>
+<main>
+<section id="authCard" class="card">
+<h3>Connexion</h3>
+<div id="loginBox">
+<label>Email</label><input id="email" type="email" autocomplete="username" placeholder="Votre adresse email">
+<label>Mot de passe</label><div class="password-wrap"><input id="password" type="password" autocomplete="current-password" placeholder="Mot de passe"><button class="toggle-password" type="button" data-toggle="password" aria-label="Afficher le mot de passe">👁️</button></div>
+<button id="loginBtn">Se connecter</button>
+</div>
+<div id="upgradeBox" class="hidden">
+<p>Votre session actuelle est temporaire. Pour conserver votre compte administrateur et passer à une connexion sécurisée, ajoutez un email et un mot de passe.</p>
+<label>Email du compte administrateur</label><input id="upgradeEmail" type="email" placeholder="Email">
+<label>Nouveau mot de passe (8 caractères minimum)</label><div class="password-wrap"><input id="upgradePassword" type="password" minlength="8" placeholder="Mot de passe"><button class="toggle-password" type="button" data-toggle="upgradePassword" aria-label="Afficher le mot de passe">👁️</button></div>
+<button id="upgradeBtn">Sécuriser mon compte actuel</button>
+</div>
+<div id="authStatus" class="status">Veuillez vous connecter.</div>
+</section>
+
+<section id="appArea" class="hidden">
+<div class="card">
+<div class="row"><strong id="userInfo"></strong><span class="pill" id="roleInfo"></span><button class="secondary" id="logoutBtn">Déconnexion</button></div><nav id="pageNav" class="row" style="margin-top:12px"><button type="button" data-page="lineHome">② Choisir ligne</button><button type="button" data-page="productionArea">③ Production</button><button type="button" data-page="dashboardArea">④ Dashboard KPI</button><button type="button" data-page="casseArea">⑤ Casse</button><button type="button" data-page="excelArea">⑥ Excel</button><button type="button" data-page="sopArea">⑦ S&amp;OP</button><button type="button" data-page="adminArea" id="adminNavBtn" class="hidden">⑧ Membres</button></nav>
+</div>
+
+
+
+<section id="lineHome" class="card hidden">
+<h3>Choisir la ligne de production</h3>
+<p class="muted">اختار الخط اللي خدام فيه اليوم. يمكنك تغيير الخط في أي وقت.</p>
+<p class="muted">علّم على جميع الخطوط اللي مكلف بها في هذا الشيفت، ثم اضغط على تأكيد الاختيار.</p><div id="lineCards" class="grid"></div><div class="total">الخطوط المختارة: <span id="selectedLineCount">0</span></div><button type="button" id="confirmLinesBtn">تأكيد الخطوط المختارة</button><div id="lineSelectStatus" class="status">اختار خطاً واحداً أو أكثر.</div>
+</section>
+
+
+<section id="productionArea">
+<div class="card"><button type="button" class="secondary" id="changeLineBtn">← Changer de ligne</button></div>
+<div class="card">
+<h3>1. Informations de production</h3>
+<div class="grid">
+<div><label>Date de production (cycle 07:00 → 07:00)</label><input type="date" id="date"></div>
+<div><label>Shift</label><select id="shift"><option>1er</option><option>2ème</option><option>3ème</option></select></div>
+<div><label>Ligne</label><select id="ligne"></select></div>
+<div id="formatWrap" class="hidden"><label>Format</label><select id="format"><option value="N/A">N/A</option></select></div>
+<div><label>Chef d'équipe</label><input id="chef" placeholder="Nom du chef"></div>
+<div><label>Superviseur</label><input id="superviseur" placeholder="Nom du superviseur"></div>
+</div>
+<div class="status" id="shiftTime">Horaires: 07:00–15:00</div>
+</div>
+<div class="card">
+<h3>2. Production par heure</h3>
+<div class="hour-legend"><span class="good">Vert : ≥ 100% cadence</span><span class="mid">Orange : 90–99%</span><span class="low">Rouge : &lt; 90%</span><span class="info">Bleu : cadence non définie</span></div>
+<div id="hours" class="hours"></div>
+<div class="total">Total production: <span id="totalProduction">0</span></div>
+</div>
+<div class="card">
+<h3>3. Casse</h3><div class="grid">
+<div id="cassePreformeWrap"><label>Casse Préforme</label><input type="number" min="0" step="1" id="casse_preforme" value="0"></div>
+<div><label>Casse Bouteille</label><input type="number" min="0" step="1" id="casse_bouteille" value="0"></div>
+</div></div>
+<div class="card">
+<h3>4. Arrêts (minutes)</h3><div id="stops" class="stops"></div>
+<div class="total">Total arrêts: <span id="totalArrets">0</span> minutes</div>
+</div>
+<div class="card">
+<h3>5. Enregistrement</h3>
+<button id="saveBtn">Enregistrer la production</button><button class="secondary" id="loadBtn">Charger les données</button>
+<div id="saveStatus" class="status">En attente.</div>
+<small>Les données sont enregistrées uniquement après avoir appuyé sur Enregistrer.</small>
+</div>
+</section>
+
+<section id="dashboardArea" class="card hidden">
+<div class="dash-hero"><div><h2>Tableau de bord – Performance Production</h2><p>Société des Eaux Minérales d’Oulmès · Cycle de production 07:00 → 07:00</p></div><span class="dash-live">Suivi des données enregistrées</span></div>
+<div class="dash-filter-panel"><div class="dash-filter-title">Filtres d’analyse</div>
+<div class="grid">
+<div><label>Date début</label><input type="date" id="dashStart"></div>
+<div><label>Date fin</label><input type="date" id="dashEnd"></div>
+<div><label>Ligne</label><select id="dashLine"><option value="">Toutes les lignes</option></select></div>
+<div><label>Format</label><select id="dashFormat"><option value="">Tous les formats</option></select></div>
+<div><label>Shift (filtre détail)</label><select id="dashShift"><option value="">Tous les shifts</option><option>1er</option><option>2ème</option><option>3ème</option></select></div>
+</div>
+<div class="row"><button type="button" id="dashRefreshBtn">↻ Actualiser le Dashboard</button><button type="button" id="exportExcelBtn">▣ Exporter le rapport Excel (.xlsx)</button></div></div>
+<div id="dashStatus" class="status">Chargement des données KPI...</div>
+<div class="cadence-panel" id="dailyTargetAdminPanel" style="margin:14px 0">
+ <h3>🎯 Objectif journalier</h3>
+ <div class="grid"><div><label for="dailyTargetValue">Objectif de production par jour (bouteilles)</label><input id="dailyTargetValue" type="number" min="0" step="100000" value="5000000"></div><div style="display:flex;align-items:end"><button type="button" id="saveDailyTargetBtn">Enregistrer l'objectif</button></div></div>
+ <div class="status" id="dailyTargetStatus">Objectif journalier partagé avec les utilisateurs.</div>
+</div>
+<div class="kpi-top">
+ <div class="kpi-box"><small>Production cumulée du mois</small><strong id="dashMonthlyProduction">0</strong><small>Bouteilles</small></div>
+ <div class="kpi-box" id="dailyTargetKpiBox"><small>Objectif journalier</small><strong id="dashDailyTargetDisplay">5 000 000</strong><small>Bouteilles / jour</small></div>
+ <div class="kpi-box"><small>Total Production</small><strong id="dashTotalProduction">0</strong><small>Bouteilles</small></div>
+ <div class="kpi-box"><small>Objectif calculé</small><strong id="dashTotalObjective">0</strong><small>Bouteilles</small></div>
+ <div class="kpi-box"><small>Taux global</small><strong id="dashGlobalRate">0%</strong><small>Réalisation / Objectif</small></div>
+ <div class="kpi-box"><small>Total arrêts</small><strong id="dashTotalStops">0</strong><small>Minutes</small></div>
+</div>
+<div class="grid">
+ <div class="total">Casse Préforme : <span id="dashPreformBreak">0</span></div>
+ <div class="total">Casse Bouteille : <span id="dashBottleBreak">0</span></div>
+</div>
+<div class="dash-chart-card"><div class="dash-section-title">Production par ligne</div><p class="dash-chart-sub">Comparaison des quantités enregistrées sur la période et selon les filtres sélectionnés.</p><div id="dashProductionChart" class="dash-bars"><div class="muted">Les données apparaîtront après actualisation.</div></div></div>
+<div class="dash-section-title">Performance par shift</div>
+<div id="kpiShiftTables"></div>
+<div class="kpi-total">🏆 Total Production 24H / période : <span id="dash24Total">0</span> bouteilles &nbsp; | &nbsp; Taux global : <span id="dash24Rate">0%</span></div>
+<div class="cadence-panel" id="cadenceAdminPanel" style="display:none">
+ <h3>⚙️ Réglage des cadences – Administrateur</h3>
+ <p class="muted">Choisissez une ligne et un format. Toutes les vitesses sont réglables selon l’état de la machine et la demande. Pour L14, la plage autorisée est 60 000 à 80 000 bouteilles/heure. Les changements s'appliquent aux prochains enregistrements. Les nouvelles productions conservent leur cadence et leur objectif au moment de la sauvegarde.</p>
+ <div class="grid"><div><label>Ligne</label><select id="cadenceLine"></select></div><div><label>Format</label><select id="cadenceFormat"></select></div></div>
+ <label>Cadence (bouteilles / heure)</label><div class="row"><button type="button" class="secondary" id="cadenceMinus">−</button><input id="cadenceValue" type="number" min="0" step="100" style="flex:1;min-width:100px"><button type="button" class="secondary" id="cadencePlus">+</button></div>
+ <button type="button" id="saveCadenceBtn">💾 Enregistrer la cadence</button><div id="cadenceStatus" class="status">Les cadences initiales sont chargées.</div>
+ <h3 style="margin-top:15px">Cadences actuelles</h3><div id="cadenceSummary" class="tablewrap"></div>
+</div>
+<h3 style="margin-top:18px">Détail des arrêts</h3><div id="dashByStop" class="tablewrap"></div>
+<h3 style="margin-top:18px">Détail des enregistrements</h3><div id="dashRecords" class="tablewrap"></div>
+</section>
+
+<section id="casseArea" class="card hidden">
+<h3>📉 Suivi de la Casse – Préforme & Bouteille</h3>
+<p class="muted">Comparaison des quantités de casse avec la production réalisée, pour la journée et le cumul mensuel.</p>
+<div class="row"><div><label>Date du jour</label><input type="date" id="casseDate"></div><div style="display:flex;align-items:end"><button type="button" id="casseRefreshBtn">Actualiser</button></div></div>
+<div class="kpi-top">
+ <div class="kpi-box"><small>Production du jour</small><strong id="casseDayProd">0</strong><small>Bouteilles</small></div>
+ <div class="kpi-box"><small>Casse Préforme – Jour</small><strong id="casseDayPre">0</strong><small id="casseDayPreRate">0% de la production</small></div>
+ <div class="kpi-box"><small>Casse Bouteille – Jour</small><strong id="casseDayBottle">0</strong><small id="casseDayBottleRate">0% de la production</small></div>
+ <div class="kpi-box"><small>Production cumulée du mois</small><strong id="casseMonthProd">0</strong><small>Bouteilles</small></div>
+ <div class="kpi-box"><small>Casse Préforme – Mois</small><strong id="casseMonthPre">0</strong><small id="casseMonthPreRate">0% de la production</small></div>
+ <div class="kpi-box"><small>Casse Bouteille – Mois</small><strong id="casseMonthBottle">0</strong><small id="casseMonthBottleRate">0% de la production</small></div>
+</div>
+<h3>Comparaison Jour / Mois</h3><div id="casseComparison" class="tablewrap"></div>
+<div id="casseStatus" class="status">Chargement des données de casse...</div>
+</section>
+
+<section id="excelArea" class="card hidden"><h3>⑤ Export Excel – Rapport KPI</h3><p class="muted">Téléchargez le rapport Excel : production horaire, casse et arrêts. Les filtres du Dashboard sont appliqués.</p><div class="kpi-total">Production de la période : <span id="excelTotal">0</span> bouteilles</div><button type="button" id="excelExportBtn">Télécharger le rapport Excel (.xlsx)</button><button type="button" class="secondary" id="excelBackBtn">← Retour au Dashboard</button><div id="excelStatus" class="status">Actualisez d'abord le Dashboard pour charger les données.</div><a id="excelDownloadLink" class="hidden" href="#" download="Rapport_Production_Oulmes.xlsx" style="display:none;background:#15803d;color:#fff;padding:14px 16px;border-radius:8px;text-align:center;text-decoration:none;font-weight:bold;margin-top:12px">⬇ Télécharger le fichier Excel (.xlsx)</a></section>
+<section id="sopArea" class="card hidden">
+<h3>📦 S&amp;OP – Demandes de production et logistique</h3>
+<p class="muted">Créer les demandes journalières et suivre leur réalisation par ligne.</p>
+<div id="sopCreatePanel" class="card hidden">
+<h3>Nouvelle demande</h3>
+<div class="grid">
+<div><label>Date</label><input id="sopDate" type="date"></div>
+<div><label>Ligne</label><select id="sopLine"></select></div>
+<div><label>Format</label><input id="sopFormat" placeholder="Ex. 33 CL"></div>
+<div><label>Article / Produit</label><input id="sopProduct" placeholder="Ex. Euro palettes"></div>
+<div><label>Shift (facultatif)</label><select id="sopShift"><option value="">Tous les shifts</option><option value="1er">1er – 07:00 à 15:00</option><option value="2ème">2ème – 15:00 à 23:00</option><option value="3ème">3ème – 23:00 à 07:00</option></select></div>
+<div><label>Quantité / Objectif</label><input id="sopQty" type="number" min="0" step="1" placeholder="Quantité"></div>
+</div>
+<label>Demande / Commentaire</label><input id="sopRequest" placeholder="Ex. 4 voyages Euro palettes">
+<button type="button" id="sopCreateBtn">Enregistrer la demande</button><div id="sopCreateStatus" class="status">Remplissez les informations de la demande.</div>
+</div>
+<div class="grid"><div><label>Filtrer par date</label><input id="sopFilterDate" type="date"></div><div><label>Filtrer par ligne</label><select id="sopFilterLine"><option value="">Toutes les lignes</option></select></div><div><label>Filtrer par état</label><select id="sopFilterStatus"><option value="">Tous les états</option><option>Non réalisé</option><option>Partiellement terminé</option><option>Terminé</option></select></div></div>
+<div class="row"><button type="button" id="sopRefreshBtn">Actualiser les demandes</button></div>
+<div id="sopStatus" class="status">Chargement des demandes S&amp;OP...</div><div id="sopOrders" class="tablewrap"></div>
+</section>
+
+<section id="adminArea" class="hidden">
+<div class="card">
+<h3>Ajouter un membre</h3>
+<p class="muted">Créer des comptes utilisateurs, choisir le rôle et attribuer les lignes. Vous pouvez créer autant de comptes Assistant Admin que nécessaire, sans limite fixée dans l’application. Les mots de passe sont gérés par Supabase Auth.</p>
+<label>Nom complet</label><input id="newName" placeholder="Nom et prénom">
+<label>Email</label><input id="newEmail" type="email" placeholder="email@exemple.com">
+<label>Mot de passe (8 caractères minimum)</label><div class="password-wrap"><input id="newPassword" type="password" minlength="8"><button class="toggle-password" type="button" data-toggle="newPassword" aria-label="Afficher le mot de passe">👁️</button></div>
+<label>Rôle</label><select id="newRole"><option value="chef">Chef d'équipe</option><option value="superviseur">Superviseur</option><option value="responsable">Responsable</option><option value="ingenieur">Ingénieur</option><option value="directeur">Directeur</option><option value="maintenance">Maintenance</option><option value="qualite">Qualité</option><option value="magasin">Magasin</option><option value="methodes">Méthodes</option><option value="sop">S&amp;OP</option><option value="assistant_admin">Assistant Admin</option></select>
+<label>Lignes autorisées</label><div id="newLines" class="grid"></div>
+<button id="createUserBtn">Créer le compte</button><div id="adminStatus" class="status">Administration prête.</div>
+</div>
+<div class="card" id="testDataResetPanel">
+<h3>🧹 Réinitialisation des données de test</h3>
+<p class="muted">Supprimer les enregistrements de production de test d’une ligne précise ou de toutes les lignes. Les comptes utilisateurs, rôles, objectifs et paramètres restent inchangés. Cette opération ne crée aucun fichier Excel.</p>
+<label>Ligne à réinitialiser</label>
+<select id="resetTestLine"><option value="__ALL__">Toutes les lignes</option></select>
+<button type="button" id="resetTestDataBtn" class="danger">Réinitialiser les données sélectionnées</button>
+<div id="resetTestStatus" class="status">Fonction réservée à l’administrateur principal.</div>
+</div>
+<div class="card">
+<h3>Comptes existants</h3>
+<p class="muted">Modifier le nom, le rôle, les lignes, activer/désactiver un compte. Le compte principal est protégé. Le retrait désactive l’accès et conserve les productions.</p>
+<div id="usersList" class="tablewrap">Chargement...</div>
+<button class="secondary" id="refreshUsersBtn">Actualiser la liste</button>
+</div>
+</section>
+</section>
+</main>
+<div id="editModal" aria-hidden="true"><div id="editPanel">
+<h3>Modifier le compte</h3><input type="hidden" id="editUserId">
+<label>Nom complet</label><input id="editFullName" type="text">
+<label>Rôle</label><select id="editRole">
+<option value="chef">Chef d'équipe</option><option value="assistant_admin">Assistant Admin</option><option value="superviseur">Superviseur</option><option value="responsable">Responsable</option><option value="ingenieur">Ingénieur</option><option value="directeur">Directeur</option><option value="maintenance">Maintenance</option><option value="qualite">Qualité</option><option value="magasin">Magasin</option><option value="methodes">Méthodes</option><option value="sop">S&amp;OP</option></select>
+<label>Lignes attribuées</label><div id="editLines" class="line-checks"></div>
+<label style="display:flex;align-items:center;gap:8px"><input id="editActive" type="checkbox" style="width:auto"> Compte actif</label>
+<div id="editStatus" class="status">Modifiez les informations puis enregistrez.</div>
+<div class="row"><button type="button" id="editSaveBtn">Enregistrer les modifications</button><button type="button" class="secondary" id="editCancelBtn">Annuler</button></div>
+</div></div>
+<script>
+const SUPABASE_URL="https://zdlqmoespirmwflwmbgn.supabase.co";
+const SUPABASE_KEY="sb_publishable_XoGnqsk6jLUh200WzOMHSg_NPMsO2E6";
+const {createClient}=supabase;
+const db=createClient(SUPABASE_URL,SUPABASE_KEY);
+const $=id=>document.getElementById(id);
+const LINES=["LV03","LVF","LVSA75CL","LVSA50CL","LVPR75CL","L12","L14","L04","L11","L13","L06","L07","L10","L08","L09","L15"];
+const STOP_NAMES=["MC","EL","OP","UT","OP.R","CQ","TDE","C.LABO","R.C","A.PR","CIP"];
+const GROUPS=[
+["LV03"],["L12"],["L14"],["L04","L11"],["L13","L06"],["LVF"],["L07","L10"],["L08","L09"]
+];
+const SHIFT_HOURS={"1er":"07:00–15:00","2ème":"15:00–23:00","3ème":"23:00–07:00"};
+const FORMAT_OPTIONS={
+ "L11":["33 CL","50 CL","100 CL"],
+ "LV03":["25 CL","33 SA","33 Oulmès"],
+ "L06":["2L Sidi Ali","1.5L Sidi Ali"],
+ "L13":["2L Sidi Ali","1.5L Sidi Ali"],
+ "L12":["33CL SA","33CL AAT"],
+ "LVF":["25 CL"],
+ "LVSA75CL":["75 CL","50 CL"],
+ "LVSA50CL":["50 CL"],
+ "LVPR75CL":["75 CL"],
+ "L07":["50 CL SA","50 CL AAT"],
+ "L10":["AAT 5L","AAT 6L"],
+ "L08":["AAT 1.5L","SA 1.5L"],
+ "L09":["50CL SA","50CL AAT","33CL SA","33CL AAT"],
+ "L14":["33CL AAT","33CL SA"],
+ "L04":["33 CL Kids","Sleeve","75 CL SA Sport","65 CL SA"],
+ "L15":["50 CL AAT","50 CL SA","33 CL AAT","33 CL SA"]
+};
+const DEFAULT_CADENCES={
+ "L11|33 CL":28000,"L11|50 CL":28000,"L11|100 CL":22000,
+ "LV03|25 CL":25000,"LV03|33 SA":10000,"LV03|33 Oulmès":10000,
+ "L06|2L Sidi Ali":18000,"L06|1.5L Sidi Ali":18000,
+ "L13|2L Sidi Ali":32000,"L13|1.5L Sidi Ali":32000,
+ "L12|33CL SA":60000,"L12|33CL AAT":60000,
+ "LVF|25 CL":8000,"LVSA75CL|75 CL":5000,"LVSA75CL|50 CL":5000,
+ "LVSA50CL|50 CL":5000,"LVPR75CL|75 CL":0,
+ "L07|50 CL SA":35000,"L07|50 CL AAT":35000,
+ "L10|AAT 5L":6000,"L10|AAT 6L":6000,
+ "L08|AAT 1.5L":42000,"L08|SA 1.5L":42000,
+ "L09|50CL SA":40000,"L09|50CL AAT":40000,"L09|33CL SA":40000,"L09|33CL AAT":40000,
+ "L14|33CL AAT":70000,"L14|33CL SA":70000,
+ "L04|33 CL Kids":25000,"L04|Sleeve":25000,"L04|75 CL SA Sport":25000,"L04|65 CL SA":25000,
+ "L15|50 CL AAT":88000,"L15|50 CL SA":88000,"L15|33 CL AAT":88000,"L15|33 CL SA":88000
+};
+let cadenceMap={...DEFAULT_CADENCES};
+const cadenceKey=(line,format)=>`${line}|${format||"N/A"}`;
+function formatsForLine(line){return FORMAT_OPTIONS[line]||["N/A"]}
+function currentFormat(){return $("format").value||"N/A"}
+function currentCadence(line,format){return Number(cadenceMap[cadenceKey(line,format)]||0)}
+let currentUser=null,currentRole=null,assignedLines=[],isAdmin=false,canManageUsers=false,isViewer=false,canViewDailyTarget=false,loading=false;
+let selectedProductionLines=[];
+function msg(id,t){$(id).textContent=t}
+function today(){const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)}
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function statusLine(t){msg("saveStatus",t)}
+function setupFields(){
+ $("hours").innerHTML="";
+ for(let i=0;i<8;i++){const d=document.createElement("div");d.className="hour-entry";d.innerHTML=`<label>Heure ${i+1}</label><input class="production hour-info" type="number" min="0" step="1" value="0" aria-label="Production heure ${i+1}">`;$("hours").appendChild(d)}
+ $("stops").innerHTML="";
+ STOP_NAMES.forEach(n=>{const d=document.createElement("div");d.innerHTML=`<label>${n} (minutes)</label><input class="stop" data-name="${n}" type="number" min="0" step="1" value="0">`;$("stops").appendChild(d)});
+}
+function getProductions(){return [...document.querySelectorAll(".production")].map(x=>Math.max(0,Number(x.value)||0))}
+function getStops(){const o={};document.querySelectorAll(".stop").forEach(x=>o[x.dataset.name]=Math.max(0,Number(x.value)||0));return o}
+function updateHourlyProductionColors(){
+ const cadence=currentCadence(selectedLine(),currentFormat());
+ document.querySelectorAll(".production").forEach(input=>{
+  input.classList.remove("hour-good","hour-mid","hour-low","hour-info");
+  if(!cadence){input.classList.add("hour-info");return;}
+  const value=Math.max(0,Number(input.value)||0),rate=value/cadence*100;
+  input.classList.add(rate>=100?"hour-good":rate>=90?"hour-mid":"hour-low");
+ });
+}
+function calculate(){
+ updateHourlyProductionColors();
+ $("totalProduction").textContent=getProductions().reduce((a,b)=>a+b,0).toLocaleString("fr-FR");
+ $("totalArrets").textContent=Object.values(getStops()).reduce((a,b)=>a+b,0).toLocaleString("fr-FR");
+}
+function clearFields(){
+ loading=true;$("chef").value="";$("superviseur").value="";$("casse_preforme").value=0;$("casse_bouteille").value=0;
+ document.querySelectorAll(".production,.stop").forEach(x=>x.value=0);calculate();loading=false;
+}
+function selectedLine(){return $("ligne").value}
+function isGlassLine(line=selectedLine()){
+ return ["LV03","LVF","LVSA75CL","LVSA50CL","LVPR75CL"].includes(line);
+}
+function updateFormatVisibility(){
+ const line=selectedLine(),formats=formatsForLine(line),sel=$("format");
+ const previous=sel.value;
+ sel.innerHTML=formats.map(f=>`<option value="${esc(f)}">${esc(f)}</option>`).join("");
+ sel.value=formats.includes(previous)?previous:formats[0];
+ $("formatWrap").classList.toggle("hidden",formats.length===1);
+ $("cassePreformeWrap").classList.toggle("hidden", isGlassLine());
+}
+function fillLineOptions(){
+ const allowed=LINES;
+ const lvGroup=["LV03","LVSA75CL","LVSA50CL","LVPR75CL","LVF"];
+ const otherLines=allowed.filter(l=>!lvGroup.includes(l));
+ $("ligne").innerHTML="";
+ const group=document.createElement("optgroup");group.label="LV";
+ lvGroup.filter(l=>allowed.includes(l)).forEach(l=>{const o=document.createElement("option");o.value=l;o.textContent=l;group.appendChild(o)});
+ if(group.children.length)$("ligne").appendChild(group);
+ const others=document.createElement("optgroup");others.label="Autres lignes";
+ otherLines.forEach(l=>{const o=document.createElement("option");o.value=l;o.textContent=l;others.appendChild(o)});
+ if(others.children.length)$("ligne").appendChild(others);
+ if(!allowed.length){$("ligne").innerHTML='<option value="">Aucune ligne attribuée</option>'}
+}
+function renderLineCards(){
+ const box=$("lineCards");if(!box)return;
+ const lvGroup=["LV03","LVSA75CL","LVSA50CL","LVPR75CL","LVF"];
+ const otherLines=LINES.filter(l=>!lvGroup.includes(l));
+ const makeChecks=arr=>arr.map(l=>`<label style="display:flex;align-items:center;gap:8px;border:1px solid #dbe3ec;border-radius:8px;padding:10px;margin:0"><input type="checkbox" class="line-choice" value="${l}" style="width:auto"> <strong>${l}</strong></label>`).join("");
+ box.innerHTML=`<div class="card" style="grid-column:1/-1;border:2px solid #4b8bba"><strong>LV</strong><div class="grid" style="margin-top:10px">${makeChecks(lvGroup)}</div></div><div class="card" style="grid-column:1/-1"><strong>Autres lignes</strong><div class="grid" style="margin-top:10px">${makeChecks(otherLines)}</div></div>`;
+ box.querySelectorAll(".line-choice").forEach(c=>c.addEventListener("change",updateSelectedLineCount));
+ updateSelectedLineCount();
+}
+function updateSelectedLineCount(){
+ const n=document.querySelectorAll(".line-choice:checked").length;
+ if($("selectedLineCount"))$("selectedLineCount").textContent=n;
+}
+function confirmSelectedLines(){
+ const chosen=[...document.querySelectorAll(".line-choice:checked")].map(x=>x.value);
+ if(!chosen.length){msg("lineSelectStatus","خاصك تختار خطاً واحداً على الأقل.");return}
+ selectedProductionLines=chosen;
+ $("ligne").innerHTML=chosen.map(l=>`<option value="${l}">${l}</option>`).join("");
+ $("ligne").value=chosen[0];
+ updateFormatVisibility();
+ $("lineHome").classList.add("hidden");
+ $("dashboardArea").classList.add("hidden");
+ $("excelArea").classList.add("hidden");
+ $("productionArea").classList.remove("hidden");
+ msg("saveStatus",`تم اختيار ${chosen.length} خط. سجل إنتاج كل خط بوحدو.`);
+ loadRecord();
+}
+async function claimSelectedLine(){
+ if(isViewer)return true;
+ const {data,error}=await db.rpc("claim_line_shift",{
+  p_date:$('date').value,p_shift:$('shift').value,p_line:selectedLine()
+ });
+ if(error){statusLine("تعذر حجز الخط: "+error.message);$('saveBtn').disabled=true;return false;}
+ const result=Array.isArray(data)?data[0]:data;
+ if(result && result.allowed===true){$('saveBtn').disabled=false;return true;}
+ statusLine("هذا الخط محجوز من طرف قائد فريق آخر في نفس الشيفت. اختار خطاً آخر.");
+ $('saveBtn').disabled=true;return false;
+}
+async function loadRecord(){
+ if(!currentUser||!selectedLine())return;
+ if(!await claimSelectedLine())return;
+ const chosenFormat = currentFormat();
+ clearFields();statusLine("Chargement...");
+ const {data,error}=await db.from("production_records").select("*")
+ .eq("production_date",$("date").value).eq("shift",$("shift").value)
+ .eq("ligne",selectedLine()).eq("format",chosenFormat).maybeSingle();
+ if(error){statusLine("Erreur de chargement: "+error.message);return}
+ if(data){
+  loading=true;$("chef").value=data.chef||"";$("superviseur").value=data.superviseur||"";
+  $("casse_preforme").value=isGlassLine()?0:(data.casse_preforme||0);$("casse_bouteille").value=data.casse_bouteille||0;
+  const p=Array.isArray(data.productions)?data.productions:[];
+  document.querySelectorAll(".production").forEach((x,i)=>x.value=p[i]??0);
+  const a=data.arrets||{};document.querySelectorAll(".stop").forEach(x=>x.value=a[x.dataset.name]??0);
+  loading=false;calculate();statusLine("Données précédentes chargées.");
+ }else { statusLine("Aucun enregistrement pour ce format. Saisissez les données puis enregistrez."); }
+}
+async function saveRecord(){
+ if(!currentUser){statusLine("يرجى تسجيل الدخول أولا.");return}
+ if(!selectedLine()){statusLine("اختر الخط أولا.");return}
+ if(!await claimSelectedLine())return;
+ const record={production_date:$("date").value,shift:$("shift").value,ligne:selectedLine(),format:currentFormat(),
+ chef:$("chef").value.trim()||"Non renseigné",superviseur:$("superviseur").value.trim()||null,
+ productions:getProductions(),total_production:getProductions().reduce((a,b)=>a+b,0),
+ casse_preforme:isGlassLine()?0:(Number($("casse_preforme").value)||0),casse_bouteille:Number($("casse_bouteille").value)||0,
+ arrets:getStops(),total_arrets:Object.values(getStops()).reduce((a,b)=>a+b,0),
+ cadence_snapshot:currentCadence(selectedLine(),currentFormat()),
+ objective_snapshot:currentCadence(selectedLine(),currentFormat())*Math.max(0,(480-Math.min(480,Object.values(getStops()).reduce((a,b)=>a+b,0)))/60),
+ created_by:currentUser.id};
+ statusLine("Enregistrement en cours...");
+ const {error}=await db.from("production_records").upsert(record,{onConflict:"production_date,shift,ligne,format"});
+ statusLine(error?"Erreur de sauvegarde: "+error.message:"Production enregistrée avec succès ✓");
+}
+function showApp(profile){
+ currentRole=profile.role;assignedLines=profile.assigned_lines||[];isAdmin=currentRole==="admin";
+ const normalizedRole=String(currentRole||"").toLowerCase().trim().replace(/[\s&-]+/g,"_");
+ // L'objectif journalier est réservé à Admin et aux comptes S&OP ingénieurs.
+ canViewDailyTarget=isAdmin||["sop","sop_ingenieur","ingenieur_sop","sop_engineer","engineer_sop","s_et_op_ingenieur"].includes(normalizedRole);
+ canManageUsers=isAdmin||currentRole==="assistant_admin";
+ isViewer=["superviseur","responsable","ingenieur","directeur","maintenance","qualite","magasin","methodes","sop"].includes(currentRole);
+ $("authCard").classList.add("hidden");$("appArea").classList.remove("hidden");
+ $("userInfo").textContent=profile.full_name||currentUser.email||"Utilisateur";
+ $("roleInfo").textContent=currentRole;
+ $("adminArea").classList.toggle("hidden",!canManageUsers);$("adminNavBtn").classList.toggle("hidden",!canManageUsers);
+ const resetPanel=$("testDataResetPanel");if(resetPanel)resetPanel.classList.toggle("hidden",!isAdmin);
+ const resetSelect=$("resetTestLine");if(resetSelect&&resetSelect.options.length<=1)resetSelect.innerHTML=`<option value="__ALL__">Toutes les lignes</option>`+LINES.map(l=>`<option value="${esc(l)}">${esc(l)}</option>`).join("");
+ $("productionArea").classList.remove("hidden");
+ fillLineOptions();updateFormatVisibility();renderLineCards();
+ if(!isViewer){$("lineHome").classList.remove("hidden");$("dashboardArea").classList.add("hidden");$("excelArea").classList.add("hidden");$("productionArea").classList.add("hidden");}
+ if(isViewer){$("dashboardArea").classList.remove("hidden");[...document.querySelectorAll("#productionArea input,#productionArea select")].forEach(x=>x.disabled=true);$("ligne").disabled=false;$("date").disabled=false;$("shift").disabled=false;$("format").disabled=false;$("saveBtn").classList.add("hidden");$("loadBtn").classList.add("hidden");}
+ if(canManageUsers)loadUsers();
+ initSop();
+ $("cadenceAdminPanel").style.display=isAdmin?"block":"none";
+ $("dailyTargetAdminPanel").classList.toggle("hidden",!canViewDailyTarget);
+ $("dailyTargetKpiBox").classList.toggle("hidden",!canViewDailyTarget);
+ // Initialiser les listes ligne/format avant toute lecture Supabase.
+ if(isAdmin)initCadenceEditor();
+ loadCadences();
+ loadRecord();
+}
+async function getProfile(){
+ const {data,error}=await db.from("user_roles").select("role,full_name,assigned_lines,is_active").eq("user_id",currentUser.id).maybeSingle();
+ if(error)throw error;if(!data)throw new Error("Compte sans rôle dans user_roles. Contactez l'administrateur.");
+ if(!data.is_active)throw new Error("Ce compte est désactivé.");
+ showApp(data);
+}
+async function connectExisting(){
+ const {data,error}=await db.auth.getSession();if(error)throw error;
+ if(data.session){currentUser=data.session.user;
+  if(currentUser.is_anonymous){$("loginBox").classList.add("hidden");$("upgradeBox").classList.remove("hidden");msg("authStatus","Session temporaire détectée. Sécurisez votre compte administrateur.");return}
+  await getProfile();
+ }
+}
+document.querySelectorAll("[data-toggle]").forEach(btn=>{
+ btn.addEventListener("click",()=>{
+  const field=$(btn.dataset.toggle);
+  if(!field)return;
+  const show=field.type==="password";
+  field.type=show?"text":"password";
+  btn.textContent=show?"🙈":"👁️";
+  btn.setAttribute("aria-label",show?"Masquer le mot de passe":"Afficher le mot de passe");
+ });
+});
+$("loginBtn").onclick=async()=>{
+ msg("authStatus","Connexion en cours...");
+ const {data,error}=await db.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});
+ if(error){msg("authStatus","Erreur: "+error.message);return}
+ currentUser=data.user;try{await getProfile()}catch(e){msg("authStatus","Erreur de profil: "+e.message)}
+};
+$("upgradeBtn").onclick=async()=>{
+ const email=$("upgradeEmail").value.trim(),password=$("upgradePassword").value;
+ if(!email||password.length<8){msg("authStatus","Entrez un email et un mot de passe de 8 caractères minimum.");return}
+ msg("authStatus","Sécurisation du compte...");
+ const {data,error}=await db.auth.updateUser({email,password});
+ if(error){msg("authStatus","Erreur: "+error.message);return}
+ currentUser=data.user;msg("authStatus","Compte mis à jour. Si Supabase demande une confirmation email, confirmez-la puis reconnectez-vous.");
+ try{await getProfile()}catch(e){msg("authStatus",e.message)}
+};
+$("logoutBtn").onclick=async()=>{await db.auth.signOut();location.reload()};
+function lineCheckboxes(container,selected=[]){
+ $(container).innerHTML=LINES.map(l=>`<label style="font-weight:normal;margin:4px 0"><input style="width:auto" type="checkbox" value="${l}" ${selected.includes(l)?"checked":""}> ${l}</label>`).join("");
+}
+function checkedLines(container){return [...$(container).querySelectorAll('input[type="checkbox"]:checked')].map(x=>x.value)}
+lineCheckboxes("newLines");
+async function adminRequest(body){
+ const {data}=await db.auth.getSession();const token=data.session?.access_token;
+ if(!token)throw new Error("Session expirée. Reconnectez-vous.");
+ const res=await fetch(SUPABASE_URL+"/functions/v1/admin-users",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token,"apikey":SUPABASE_KEY},body:JSON.stringify(body)});
+ const json=await res.json().catch(()=>({}));
+ if(!res.ok)throw new Error(json.error||json.message||"Erreur Edge Function "+res.status);
+ return json;
+}
+$("createUserBtn").onclick=async()=>{
+ try{
+  msg("adminStatus","Création en cours...");
+  await adminRequest({action:"create",email:$("newEmail").value.trim(),password:$("newPassword").value,full_name:$("newName").value.trim(),role:$("newRole").value,assigned_lines:checkedLines("newLines")});
+  msg("adminStatus","Compte créé avec succès ✓");$("newName").value="";$("newEmail").value="";$("newPassword").value="";lineCheckboxes("newLines");await loadUsers();
+ }catch(e){msg("adminStatus","Erreur: "+e.message)}
+};
+async function loadUsers(){
+ $("usersList").textContent="Chargement...";
+ const {data,error}=await db.from("user_roles").select("user_id,full_name,role,assigned_lines,is_active");
+ if(error){$("usersList").textContent="Erreur: "+error.message;return}
+ if(!data.length){$("usersList").textContent="Aucun compte.";return}
+ $("usersList").innerHTML=`<table><thead><tr><th>Nom</th><th>Rôle</th><th>Lignes</th><th>État</th><th>Action</th></tr></thead><tbody>${data.map(u=>`<tr><td>${esc(u.full_name)}</td><td>${esc(u.role)}</td><td>${esc((u.assigned_lines||[]).join(", "))}</td><td>${u.is_active?"Actif":"Désactivé"}</td><td><button class="secondary" data-edit="${u.user_id}">Modifier</button> <button class="danger" data-remove="${u.user_id}">${u.is_active?"Désactiver":"Réactiver"}</button></td></tr>`).join("")}</tbody></table>`;
+ $("usersList").querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>openEditUser(data.find(u=>u.user_id===b.dataset.edit)));
+ $("usersList").querySelectorAll("[data-remove]").forEach(b=>b.onclick=()=>deactivateUser(data.find(u=>u.user_id===b.dataset.remove)));
+}
+async function deactivateUser(u){
+ if(!u)return;
+ if(u.user_id===currentUser.id){alert("Vous ne pouvez pas désactiver votre propre compte.");return}
+ const nextActive=!u.is_active;
+ const actionText=nextActive?"réactiver":"désactiver";
+ if(!confirm("Voulez-vous "+actionText+" le compte de "+(u.full_name||"cet utilisateur")+" ? Les anciennes productions seront conservées."))return;
+ try{
+  await adminRequest({action:"update",user_id:u.user_id,full_name:u.full_name||"Utilisateur",role:u.role,assigned_lines:u.assigned_lines||[],is_active:nextActive});
+  msg("adminStatus",nextActive?"Compte réactivé ✓":"Accès utilisateur désactivé ✓");await loadUsers();
+ }catch(e){msg("adminStatus","Erreur: "+e.message)}
+}
+let editingUser=null;
+function openEditUser(u){
+ if(!u)return;
+ if(u.user_id===currentUser.id){alert("Pour protéger votre accès, vous ne pouvez pas modifier votre propre compte ici.");return}
+ editingUser=u;
+ $("editUserId").value=u.user_id;
+ $("editFullName").value=u.full_name||"";
+ $("editRole").value=u.role;
+ $("editActive").checked=!!u.is_active;
+ $("editLines").innerHTML=LINES.map(l=>`<label><input type="checkbox" value="${l}" ${((u.assigned_lines||[]).includes(l))?"checked":""}> ${l}</label>`).join("");
+ $("editStatus").textContent="Modifiez les informations puis enregistrez.";
+ $("editModal").classList.add("open");$("editModal").setAttribute("aria-hidden","false");
+}
+function closeEditUser(){editingUser=null;$("editModal").classList.remove("open");$("editModal").setAttribute("aria-hidden","true")}
+$("editCancelBtn").onclick=closeEditUser;
+$("editSaveBtn").onclick=async()=>{
+ if(!editingUser)return;
+ const name=$("editFullName").value.trim();
+ const role=$("editRole").value;
+ const lines=[...$("editLines").querySelectorAll('input:checked')].map(x=>x.value);
+ if(!name){$("editStatus").textContent="Veuillez saisir le nom complet.";return}
+ if(currentRole==="assistant_admin" && role==="assistant_admin"){$("editStatus").textContent="Un Assistant Admin ne peut pas attribuer ce rôle.";return}
+ $("editSaveBtn").disabled=true;$("editStatus").textContent="Enregistrement en cours...";
+ try{
+  await adminRequest({action:"update",user_id:editingUser.user_id,full_name:name,role,assigned_lines:lines,is_active:$("editActive").checked});
+  msg("adminStatus","Compte modifié avec succès ✓");closeEditUser();await loadUsers();
+ }catch(e){$("editStatus").textContent="Erreur: "+e.message}
+ finally{$("editSaveBtn").disabled=false}
+};
+$("refreshUsersBtn").onclick=loadUsers;
+$("saveBtn").onclick=saveRecord;$("loadBtn").onclick=loadRecord;
+$("confirmLinesBtn").onclick=confirmSelectedLines;
+$("shift").onchange=()=>{$("shiftTime").textContent="Horaires: "+SHIFT_HOURS[$("shift").value];loadRecord()};
+$("date").onchange=loadRecord;$("ligne").onchange=()=>{updateFormatVisibility();loadRecord()};$("format").onchange=()=>{loadRecord();};
+document.addEventListener("input",e=>{if(e.target.matches(".production,.stop")||["chef","superviseur","casse_preforme","casse_bouteille"].includes(e.target.id))calculate()});
+$("changeLineBtn").onclick=()=>{if(isViewer)return;$("productionArea").classList.add("hidden");$("lineHome").classList.remove("hidden");document.querySelectorAll(".line-choice").forEach(c=>c.checked=selectedProductionLines.includes(c.value));updateSelectedLineCount();};
+// Dashboard KPI V20 – objectif journalier réservé Admin/S&OP ingénieurs + cumul mensuel automatique
+let dashboardRows=[];
+let dashboardAutoMonthKey="";
+function currentMonthKey(){return today().slice(0,7)}
+function applyCurrentMonthPeriod(force=false){
+ const key=currentMonthKey();
+ if(force||key!==dashboardAutoMonthKey){
+  const d=today();
+  $("dashStart").value=d.slice(0,8)+"01";
+  $("dashEnd").value=d;
+  dashboardAutoMonthKey=key;
+  return true;
+ }
+ return false;
+}
+function initDashboardFilters(){
+ if($("casseDate"))$("casseDate").value=today();
+ const sel=$("dashLine");sel.innerHTML='<option value="">Toutes les lignes</option>';
+ LINES.forEach(l=>{const o=document.createElement("option");o.value=l;o.textContent=l;sel.appendChild(o)});
+ refreshDashboardFormats();
+ updateHourlyProductionColors();
+ const d=today();$("dashEnd").value=d;$("dashStart").value=d.slice(0,8)+"01";dashboardAutoMonthKey=d.slice(0,7);
+}
+function csvCell(v){let x=String(v??"");if(/^[=+@\-]/.test(x))x="'"+x;return '"'+x.replace(/"/g,'""')+'"'}
+function downloadCSV(rows,filename){
+ const csv='\ufeff'+rows.map(r=>r.map(csvCell).join(';')).join('\r\n');
+ const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});const url=URL.createObjectURL(blob);
+ const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function fmt(n){return Math.round(Number(n)||0).toLocaleString('fr-FR')}
+function pct(n){return `${(Number(n)||0).toFixed(1).replace('.',',')}%`}
+function kpiTone(rate){const v=Number(rate)||0;return v>=100?'tone-good':v>=90?'tone-mid':'tone-low'}
+function setKpiTone(id,tone){const el=$(id);if(!el)return;const card=el.closest('.kpi-box')||el.closest('.kpi-total');if(!card)return;card.classList.remove('tone-good','tone-mid','tone-low','tone-info','tone-stop');card.classList.add(tone)}
+function stopMinutes(r){return Math.min(480,Math.max(0,Number(r.total_arrets)||Object.values(r.arrets||{}).reduce((a,b)=>a+(Number(b)||0),0)))}
+function rowCadence(r){return Number(r.cadence_snapshot)||currentCadence(r.ligne,r.format)}
+function rowObjective(r){if(r.objective_snapshot!==null&&r.objective_snapshot!==undefined)return Number(r.objective_snapshot)||0;const c=rowCadence(r);return c*Math.max(0,(480-stopMinutes(r))/60)}
+function rowRate(r){const o=rowObjective(r);return o>0?(Number(r.total_production)||0)/o*100:0}
+function aggregateFor(shift,lineFilter,formatFilter){
+ const rows=filteredDashboardRows().filter(r=>r.shift===shift&&(!lineFilter||r.ligne===lineFilter)&&(!formatFilter||r.format===formatFilter));
+ const by={};
+ rows.forEach(r=>{const f=r.format||"N/A";const key=r.ligne+"||"+f;const x=by[key]||(by[key]={line:r.ligne,format:f,production:0,objective:0,stops:0,pre:0,bottle:0,realCadence:0,count:0,missing:false});
+  const cadence=rowCadence(r),stops=stopMinutes(r),prod=Number(r.total_production)||0;
+  x.production+=prod;x.objective+=rowObjective(r);x.stops+=stops;x.pre+=Number(r.casse_preforme)||0;x.bottle+=Number(r.casse_bouteille)||0;x.realCadence+=prod/Math.max(1,(480-stops)/60);x.count++;if(!cadence)x.missing=true;
+ });
+ return Object.values(by);
+}
+function renderShiftTable(shift,label,icon,lineFilter,formatFilter){
+ const data=aggregateFor(shift,lineFilter,formatFilter);
+ const obj=data.reduce((a,x)=>a+x.objective,0),prod=data.reduce((a,x)=>a+x.production,0),rate=obj?prod/obj*100:0;
+ const rows=data.sort((a,b)=>a.line.localeCompare(b.line)).map(x=>{
+  const gap=x.production-x.objective,pr=x.production?x.pre/x.production*100:0,br=x.production?x.bottle/x.production*100:0;
+  const state=x.missing?'kpi-mid':(x.production>=x.objective?'kpi-good':x.production>=x.objective*.9?'kpi-mid':'kpi-low');
+  return `<tr><td>${esc(x.line)}<br><small>${esc(x.format)}</small></td><td class="${x.missing?'kpi-mid':''}">${x.missing?'Cadence ?':fmt(x.objective)}</td><td>${fmt(x.production)}</td><td class="${gap>=0?'kpi-positive':'kpi-negative'}">${gap>=0?'+':''}${fmt(gap)}</td><td>${fmt(x.realCadence)}</td><td>${pct(pr)}</td><td>${pct(br)}</td><td class="${state}">${x.missing?'À régler':pct(x.objective?x.production/x.objective*100:0)}</td><td>${fmt(x.stops)}</td></tr>`;
+ }).join('');
+ return `<div class="shift-panel"><div class="shift-head"><span>${icon} ${label}</span><span class="score">Évaluation ${label} : ${pct(rate)}</span></div><div class="tablewrap"><table class="kpi-table"><thead><tr><th>Ligne / Format</th><th>Objectif</th><th>Réalisation</th><th>GAP</th><th>Cadence réelle</th><th>Casse Préforme</th><th>Casse Bouteille</th><th>Taux</th><th>Arrêts min</th></tr></thead><tbody>${rows||'<tr><td colspan="9">Aucune donnée pour ce shift</td></tr>'}</tbody></table></div></div>`;
+}
+function renderCadenceEditor(){
+ if(!$("cadenceLine"))return;
+ const line=$("cadenceLine").value||LINES[0],format=$("cadenceFormat").value||formatsForLine(line)[0];
+ $("cadenceValue").value=currentCadence(line,format)||0;
+ const all=Object.entries(cadenceMap).sort((a,b)=>a[0].localeCompare(b[0]));
+ if(!$("cadenceSummary"))return;
+ $("cadenceSummary").innerHTML=`<table><thead><tr><th>Ligne / Format</th><th>Cadence / heure</th></tr></thead><tbody>${all.map(([k,v])=>`<tr><td>${esc(k.replace('|',' / '))}</td><td>${fmt(v)}</td></tr>`).join('')}</tbody></table>`;
+}
+function initCadenceEditor(){
+ const lineSel=$("cadenceLine"),formatSel=$("cadenceFormat");
+ if(!lineSel||!formatSel)return;
+ // Remplir explicitement les deux listes dès l'ouverture de l'espace Admin.
+ lineSel.innerHTML=LINES.map(l=>`<option value="${esc(l)}">${esc(l)}</option>`).join("");
+ function refreshFormats(){
+   const line=lineSel.value||LINES[0];
+   const formats=formatsForLine(line);
+   formatSel.innerHTML=formats.map(f=>`<option value="${esc(f)}">${esc(f)}</option>`).join("");
+   formatSel.value=formats[0]||"N/A";
+   renderCadenceEditor();
+ }
+ lineSel.addEventListener("change",refreshFormats);
+ formatSel.addEventListener("change",renderCadenceEditor);
+ lineSel.value="L11";
+ refreshFormats();
+ const minus=$("cadenceMinus"),plus=$("cadencePlus"),save=$("saveCadenceBtn");
+ if(minus)minus.onclick=()=>{const step=Number($("cadenceValue").step)||500;$("cadenceValue").value=Math.max(0,(Number($("cadenceValue").value)||0)-step)};
+ if(plus)plus.onclick=()=>{const step=Number($("cadenceValue").step)||500;$("cadenceValue").value=(Number($("cadenceValue").value)||0)+step};
+ if(save)save.onclick=saveCadence;
+}
+
+async function loadCadences(){
+ const {data,error}=await db.from('production_cadences').select('ligne,format,cadence');
+ if(error){msg('cadenceStatus','استعمل SQL المرفق لإنشاء جدول production_cadences في Supabase. القيم الافتراضية تعمل حالياً على هذا الجهاز فقط حتى إعداد الجدول.');return}
+ cadenceMap={...DEFAULT_CADENCES};(data||[]).forEach(x=>cadenceMap[cadenceKey(x.ligne,x.format)]=Number(x.cadence)||0);
+ renderCadenceEditor();
+}
+async function saveCadence(){
+ if(!isAdmin){msg('cadenceStatus','هذه الخاصية خاصة بالمسؤول Admin.');return}
+ const ligne=$('cadenceLine').value,format=$('cadenceFormat').value,cadence=Math.max(0,Math.round(Number($('cadenceValue').value)||0));
+ if(!ligne||!format||(!cadence && ligne!=="LVPR75CL")){msg('cadenceStatus','أدخل Cadence صحيحة.');return}
+ if(ligne==="L14"&&(cadence<60000||cadence>80000)){msg('cadenceStatus','سرعة L14 يجب أن تكون بين 60,000 و80,000.');return}
+ const {error}=await db.from('production_cadences').upsert({ligne,format,cadence,updated_by:currentUser.id,updated_at:new Date().toISOString()},{onConflict:'ligne,format'});
+ if(error){msg('cadenceStatus','خطأ في حفظ Cadence: '+error.message+' — تأكد من تنفيذ SQL المرفق.');return}
+ cadenceMap[cadenceKey(ligne,format)]=cadence;msg('cadenceStatus',`تم حفظ ${ligne} / ${format} بسرعة ${fmt(cadence)} قنينة/ساعة ✓`);renderCadenceEditor();renderDashboard();
+}
+let dailyTarget=5000000;
+async function loadDailyTarget(){
+ if(!canViewDailyTarget){$("dailyTargetAdminPanel").classList.add("hidden");$("dailyTargetKpiBox").classList.add("hidden");return}
+ const {data,error}=await db.from('production_targets').select('daily_target').eq('id',1).maybeSingle();
+ if(error){msg('dailyTargetStatus','Table production_targets à créer dans Supabase (voir SQL fourni).');return}
+ if(data&&data.daily_target!==undefined)dailyTarget=Number(data.daily_target)||0;
+ $('dailyTargetValue').value=dailyTarget;
+ $('dashDailyTargetDisplay').textContent=fmt(dailyTarget);
+}
+async function saveDailyTarget(){
+ if(!canViewDailyTarget){msg('dailyTargetStatus','Accès réservé à Admin et aux ingénieurs S&OP.');return}
+ const value=Math.max(0,Math.round(Number($('dailyTargetValue').value)||0));
+ if(!value){msg('dailyTargetStatus','Saisissez un objectif journalier valide.');return}
+ const {error}=await db.from('production_targets').upsert({id:1,daily_target:value,updated_by:currentUser.id,updated_at:new Date().toISOString()},{onConflict:'id'});
+ if(error){msg('dailyTargetStatus','Erreur Supabase : '+error.message+' — vérifiez le SQL.');return}
+ dailyTarget=value;$('dashDailyTargetDisplay').textContent=fmt(value);msg('dailyTargetStatus','Objectif journalier enregistré et partagé ✓');
+}
+function filteredDashboardRows(){
+ const line=$("dashLine")?.value||"", format=$("dashFormat")?.value||"";
+ return dashboardRows.filter(r=>(!line||r.ligne===line)&&(!format||r.format===format));
+}
+function refreshDashboardFormats(){
+ const sel=$("dashFormat"); if(!sel)return;
+ const line=$("dashLine")?.value||"";
+ const formats=[...new Set(Object.entries(FORMAT_OPTIONS).filter(([l])=>!line||l===line).flatMap(([,fs])=>fs))].sort((a,b)=>a.localeCompare(b));
+ const current=sel.value;
+ sel.innerHTML='<option value="">Tous les formats</option>'+formats.map(f=>`<option value="${esc(f)}">${esc(f)}</option>`).join("");
+ if(formats.includes(current))sel.value=current;
+}
+function renderProductionByLineChart(rows){
+ const host=$('dashProductionChart');if(!host)return;
+ const totals={};rows.forEach(r=>{const line=r.ligne||'Autre';totals[line]=(totals[line]||0)+(Number(r.total_production)||0)});
+ const items=Object.entries(totals).sort((a,b)=>b[1]-a[1]);
+ if(!items.length){host.innerHTML='<div class="muted">Aucune production enregistrée pour les filtres sélectionnés.</div>';return;}
+ const max=Math.max(1,...items.map(x=>x[1]));
+ host.innerHTML=items.map(([line,value])=>`<div class="dash-bar-row"><span class="dash-bar-name">${esc(line)}</span><div class="dash-bar-track"><div class="dash-bar-fill" style="width:${Math.max(1,value/max*100)}%"></div></div><span class="dash-bar-value">${fmt(value)}</span></div>`).join('');
+}
+function renderDashboard(){
+ const visibleRows=filteredDashboardRows();
+ renderProductionByLineChart(visibleRows);
+ const totalProd=visibleRows.reduce((a,r)=>a+(Number(r.total_production)||0),0);
+ const totalStops=visibleRows.reduce((a,r)=>a+stopMinutes(r),0);
+ const totalObj=visibleRows.reduce((a,r)=>a+rowObjective(r),0);
+ const pre=visibleRows.reduce((a,r)=>a+(Number(r.casse_preforme)||0),0),bottle=visibleRows.reduce((a,r)=>a+(Number(r.casse_bouteille)||0),0);
+ $('dashTotalProduction').textContent=fmt(totalProd);$('dashMonthlyProduction').textContent=fmt(totalProd);if(canViewDailyTarget)$('dashDailyTargetDisplay').textContent=fmt(dailyTarget);$('dashTotalObjective').textContent=fmt(totalObj);$('dashGlobalRate').textContent=pct(totalObj?totalProd/totalObj*100:0);$('dashTotalStops').textContent=fmt(totalStops);$('dashPreformBreak').textContent=fmt(pre);$('dashBottleBreak').textContent=fmt(bottle);$('dash24Total').textContent=fmt(totalProd);$('dash24Rate').textContent=pct(totalObj?totalProd/totalObj*100:0);
+ const globalRate=totalObj?totalProd/totalObj*100:0;
+ setKpiTone('dashMonthlyProduction','tone-info');setKpiTone('dashDailyTargetDisplay','tone-info');setKpiTone('dashTotalProduction',kpiTone(globalRate));setKpiTone('dashTotalObjective','tone-info');setKpiTone('dashGlobalRate',kpiTone(globalRate));setKpiTone('dashTotalStops','tone-stop');
+ const totalBox=$('dash24Total')?.closest('.kpi-total');if(totalBox){totalBox.classList.remove('tone-good','tone-mid','tone-low');totalBox.classList.add(kpiTone(globalRate))}
+
+ const lf=$('dashLine').value, ff=$('dashFormat').value;
+ $('kpiShiftTables').innerHTML=renderShiftTable('1er','Shift 1 · 07:00–15:00','☀️',lf,ff)+renderShiftTable('2ème','Shift 2 · 15:00–23:00','☀️',lf,ff)+renderShiftTable('3ème','Shift 3 · 23:00–07:00','🌙',lf,ff);
+ $('kpiShiftTables').querySelectorAll('.shift-panel').forEach(panel=>{const score=panel.querySelector('.score');if(!score)return;const m=score.textContent.match(/([0-9]+(?:[.,][0-9]+)?)%/);const rate=m?Number(m[1].replace(',','.')):0;panel.querySelector('.shift-head')?.classList.add(kpiTone(rate))});
+ const stopTotals={};STOP_NAMES.forEach(n=>stopTotals[n]=0);visibleRows.forEach(r=>{const a=r.arrets||{};STOP_NAMES.forEach(n=>stopTotals[n]+=Number(a[n])||0)});
+ $('dashByStop').innerHTML=`<table><thead><tr><th>Type d'arrêt</th><th>Durée (min)</th></tr></thead><tbody>${STOP_NAMES.map(n=>`<tr><td>${esc(n)}</td><td>${fmt(stopTotals[n])}</td></tr>`).join('')}</tbody></table>`;
+ const sorted=[...visibleRows].filter(r=>!$('dashShift').value||r.shift===$('dashShift').value).sort((a,b)=>(b.production_date||'').localeCompare(a.production_date||'')||(a.ligne||'').localeCompare(b.ligne||''));
+ $('dashRecords').innerHTML=`<table><thead><tr><th>Date</th><th>Shift</th><th>Ligne</th><th>Format</th><th>Chef</th><th>Production</th><th>Arrêts</th><th>Objectif</th><th>Taux</th></tr></thead><tbody>${sorted.map(r=>{const rate=rowRate(r);const tone=rowCadence(r)?kpiTone(rate):'kpi-mid';return `<tr><td>${esc(r.production_date)}</td><td>${esc(r.shift)}</td><td>${esc(r.ligne)}</td><td>${esc(r.format||'N/A')}</td><td>${esc(r.chef)}</td><td>${fmt(r.total_production)}</td><td>${fmt(stopMinutes(r))}</td><td>${rowCadence(r)?fmt(rowObjective(r)):'Cadence ?'}</td><td class="${tone}">${rowCadence(r)?pct(rate):'—'}</td></tr>`}).join('')||'<tr><td colspan="9">Aucune donnée</td></tr>'}</tbody></table>`;
+ renderCadenceEditor();
+}
+async function loadDashboard(){
+ // Le 1er de chaque mois, le cumul repart automatiquement du 1er au jour courant.
+ // Aucune ligne de production ni donnée historique n'est supprimée.
+ if(applyCurrentMonthPeriod())msg('dashStatus','Nouveau mois détecté : cumul mensuel réinitialisé automatiquement. Historique conservé.');
+ const from=$('dashStart').value,to=$('dashEnd').value;
+ if(!from||!to||from>to){msg('dashStatus','Vérifiez les dates: la date début doit précéder la date fin.');return}
+ msg('dashStatus','Chargement des données et des cadences...');
+ await loadCadences();
+ await loadDailyTarget();
+ let q=db.from('production_records').select('production_date,shift,ligne,format,chef,superviseur,productions,total_production,casse_preforme,casse_bouteille,arrets,total_arrets,cadence_snapshot,objective_snapshot,created_by').gte('production_date',from).lte('production_date',to).order('production_date',{ascending:false}).limit(5000);
+ if($('dashLine').value)q=q.eq('ligne',$('dashLine').value);
+ const {data,error}=await q;
+ if(error){dashboardRows=[];renderDashboard();msg('dashStatus','Erreur Dashboard: '+error.message);return}
+ dashboardRows=data||[];renderDashboard();msg('dashStatus',`${dashboardRows.length} enregistrement(s) chargé(s) du ${from} au ${to}. Objectifs calculés selon les cadences et les arrêts saisis.`+(dashboardRows.length>=5000?' Limite de 5000 lignes atteinte.':''));
+}
+async function loadCassePage(){
+ const date=$("casseDate").value||today();
+ const monthStart=date.slice(0,8)+"01";
+ $("casseDate").value=date;
+ msg("casseStatus","Chargement des données de casse...");
+ const {data,error}=await db.from("production_records").select("production_date,shift,ligne,format,total_production,casse_preforme,casse_bouteille").gte("production_date",monthStart).lte("production_date",date).order("production_date",{ascending:true}).limit(5000);
+ if(error){msg("casseStatus","Erreur Supabase : "+error.message);return}
+ const rows=data||[];
+ const sum=(arr,key)=>arr.reduce((a,r)=>a+(Number(r[key])||0),0);
+ const dayRows=rows.filter(r=>r.production_date===date);
+ const dayProd=sum(dayRows,"total_production"),dayPre=sum(dayRows,"casse_preforme"),dayBottle=sum(dayRows,"casse_bouteille");
+ const monthProd=sum(rows,"total_production"),monthPre=sum(rows,"casse_preforme"),monthBottle=sum(rows,"casse_bouteille");
+ const rate=(v,p)=>p>0?pct(v/p*100):"—";
+ $("casseDayProd").textContent=fmt(dayProd);$("casseDayPre").textContent=fmt(dayPre);$("casseDayBottle").textContent=fmt(dayBottle);
+ $("casseDayPreRate").textContent=rate(dayPre,dayProd)+" de la production";$("casseDayBottleRate").textContent=rate(dayBottle,dayProd)+" de la production";
+ $("casseMonthProd").textContent=fmt(monthProd);$("casseMonthPre").textContent=fmt(monthPre);$("casseMonthBottle").textContent=fmt(monthBottle);
+ $("casseMonthPreRate").textContent=rate(monthPre,monthProd)+" de la production";$("casseMonthBottleRate").textContent=rate(monthBottle,monthProd)+" de la production";
+ $("casseComparison").innerHTML=`<table class="kpi-table"><thead><tr><th>Indicateur</th><th>Jour (${esc(date)})</th><th>Cumul du mois (${esc(monthStart)} au ${esc(date)})</th></tr></thead><tbody><tr><td>Production</td><td>${fmt(dayProd)}</td><td>${fmt(monthProd)}</td></tr><tr><td>Casse Préforme</td><td>${fmt(dayPre)} (${rate(dayPre,dayProd)})</td><td>${fmt(monthPre)} (${rate(monthPre,monthProd)})</td></tr><tr><td>Casse Bouteille</td><td>${fmt(dayBottle)} (${rate(dayBottle,dayProd)})</td><td>${fmt(monthBottle)} (${rate(monthBottle,monthProd)})</td></tr><tr><td>Total Casse</td><td>${fmt(dayPre+dayBottle)} (${rate(dayPre+dayBottle,dayProd)})</td><td>${fmt(monthPre+monthBottle)} (${rate(monthPre+monthBottle,monthProd)})</td></tr></tbody></table>`;
+ msg("casseStatus",`${rows.length} enregistrement(s) analysé(s). Le cumul mensuel est calculé du 1er du mois jusqu'à la date choisie.`+(rows.length>=5000?" Limite de 5000 lignes atteinte.":""));
+}
+
+function excelCell(value, style){return {v:value===undefined||value===null?'':value,s:style||{}}}
+function excelStyle(bg,fg='17344D',bold=false,align='center',size=10){return {fill:{patternType:'solid',fgColor:{rgb:bg}},font:{name:'Aptos',sz:size,bold,color:{rgb:fg}},alignment:{vertical:'center',horizontal:align,wrapText:true},border:{bottom:{style:'thin',color:{rgb:'D8E2EC'}}}}}
+function excelSet(ws,addr,value,style){if(!ws[addr])ws[addr]={t:'s',v:''};ws[addr].v=value;ws[addr].s=style||{};if(typeof value==='number')ws[addr].t='n';else ws[addr].t='s'}
+function excelRange(ws,range){ws['!ref']=range}
+function excelStyleRange(ws,range,style){const r=XLSX.utils.decode_range(range);for(let R=r.s.r;R<=r.e.r;R++)for(let C=r.s.c;C<=r.e.c;C++){const a=XLSX.utils.encode_cell({r:R,c:C});if(!ws[a])ws[a]={t:'s',v:''};ws[a].s=style}}
+let excelDownloadObjectUrl=null;
+async function exportDashboard(){
+ const from=$('dashStart')?.value||today();
+ const to=$('dashEnd')?.value||today();
+ if(!from||!to||from>to){msg('dashStatus','Vérifiez les dates: la date début doit précéder la date fin.');return;}
+ if(typeof XLSX==='undefined'){
+  msg('dashStatus','Bibliothèque Excel indisponible. Vérifiez la connexion Internet puis rechargez la page.');
+  msg('excelStatus','Impossible de créer le fichier Excel : bibliothèque XLSX non chargée.');
+  return;
+ }
+ const downloadLink=$('excelDownloadLink');
+ if(downloadLink){downloadLink.style.display='none';downloadLink.classList.add('hidden');downloadLink.removeAttribute('href');}
+ msg('excelStatus','Récupération des données enregistrées dans Supabase…');
+ msg('dashStatus','Préparation du rapport Excel…');
+ try{
+  let q=db.from('production_records')
+   .select('production_date,shift,ligne,format,chef,superviseur,productions,total_production,casse_preforme,casse_bouteille,arrets,total_arrets,cadence_snapshot,objective_snapshot')
+   .gte('production_date',from).lte('production_date',to)
+   .order('production_date',{ascending:true}).order('ligne',{ascending:true}).limit(5000);
+  const line=$('dashLine')?.value||'';
+  if(line)q=q.eq('ligne',line);
+  const {data,error}=await q;
+  if(error)throw error;
+  const selectedFormat=$('dashFormat')?.value||'';
+  const selectedShift=$('dashShift')?.value||'';
+  const rows=(data||[]).filter(r=>(!selectedFormat||r.format===selectedFormat)&&(!selectedShift||r.shift===selectedShift));
+  if(!rows.length){msg('dashStatus','Aucune donnée de production pour les filtres sélectionnés.');msg('excelStatus','Aucune donnée disponible pour l’export.');return;}
+
+  const headers=['DATE','SHIFT','LIGNE','FORMAT','CHEF ÉQUIPE','SUPERVISEUR','CADENCE/HEURE','OBJECTIF CALCULÉ',
+   'PRODUCTION HEURE 1','PRODUCTION HEURE 2','PRODUCTION HEURE 3','PRODUCTION HEURE 4','PRODUCTION HEURE 5','PRODUCTION HEURE 6','PRODUCTION HEURE 7','PRODUCTION HEURE 8',
+   'PRODUCTION TOTALE','CASSE PRÉFORME','CASSE BOUTEILLE',...STOP_NAMES.map(n=>'ARRÊT '+n+' (MIN)'),'TOTAL ARRÊTS (MIN)'];
+  const dataRows=rows.map(r=>{
+   const d=r.production_date||'';
+   const dateFr=d?d.slice(8,10)+'/'+d.slice(5,7)+'/'+d.slice(0,4):'';
+   const stops=r.arrets||{};
+   const totalStops=Number(r.total_arrets)||Object.values(stops).reduce((a,b)=>a+(Number(b)||0),0);
+   const cadence=Number(r.cadence_snapshot)||currentCadence(r.ligne,r.format)||0;
+   const objective=(r.objective_snapshot!==null&&r.objective_snapshot!==undefined)?Number(r.objective_snapshot)||0:cadence*Math.max(0,(480-Math.min(480,totalStops))/60);
+   return [dateFr,r.shift||'',r.ligne||'',r.format||'',r.chef||'',r.superviseur||'',cadence,Math.round(objective),
+    ...Array.from({length:8},(_,i)=>Number((r.productions||[])[i])||0),Number(r.total_production)||0,Number(r.casse_preforme)||0,Number(r.casse_bouteille)||0,
+    ...STOP_NAMES.map(n=>Number(stops[n])||0),totalStops];
+  });
+
+  const ws=XLSX.utils.aoa_to_sheet([headers,...dataRows]);
+  ws['!cols']=headers.map((h,i)=>({wch:i===0?13:(i===4||i===5)?22:i>=8?18:16}));
+  ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:dataRows.length,c:headers.length-1}})};
+  ws['!freeze']={xSplit:0,ySplit:1};
+  headers.forEach((h,i)=>{
+   const cell=XLSX.utils.encode_cell({r:0,c:i});
+   if(ws[cell])ws[cell].s={font:{bold:true,color:{rgb:'FFFFFF'},sz:11},fill:{fgColor:{rgb:'075985'}},alignment:{horizontal:'center',vertical:'center',wrapText:true},border:{bottom:{style:'thin',color:{rgb:'CBD5E1'}}}};
+  });
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Rapport Production');
+  const filename='Rapport_Production_Oulmes_'+from+'_au_'+to+'.xlsx';
+  const excelData=XLSX.write(wb,{bookType:'xlsx',type:'array',compression:true});
+  const mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  const blob=new Blob([excelData],{type:mime});
+  if(!blob.size)throw new Error('Le fichier Excel créé est vide.');
+  if(!downloadLink)throw new Error('Le bouton de téléchargement Excel est introuvable.');
+  if(excelDownloadObjectUrl){URL.revokeObjectURL(excelDownloadObjectUrl);excelDownloadObjectUrl=null;}
+  excelDownloadObjectUrl=URL.createObjectURL(blob);
+  downloadLink.href=excelDownloadObjectUrl;
+  downloadLink.download=filename;
+  downloadLink.style.display='block';
+  downloadLink.classList.remove('hidden');
+  downloadLink.textContent='⬇ Télécharger le fichier Excel (.xlsx)';
+  const total=rows.reduce((sum,r)=>sum+(Number(r.total_production)||0),0);
+  if($('excelTotal'))$('excelTotal').textContent=fmt(total);
+  msg('dashStatus',`Rapport Excel prêt : ${rows.length} enregistrement(s).`);
+  msg('excelStatus','Le fichier Excel est prêt. Appuyez sur le bouton vert ci-dessous pour le télécharger.');
+ }catch(e){
+  console.error(e);
+  msg('dashStatus','Erreur pendant la création du fichier Excel : '+(e.message||e));
+  msg('excelStatus','Échec de l’export Excel : '+(e.message||e));
+ }
+}
+
+async function resetTestProductionData(){
+ if(!isAdmin){msg("resetTestStatus","Accès réservé à l’administrateur principal.");return}
+ const chosen=$("resetTestLine").value||"__ALL__";
+ const lines=chosen==="__ALL__"?[...LINES]:[chosen];
+ const label=chosen==="__ALL__"?"toutes les lignes":chosen;
+ const ok=confirm(`ATTENTION : cette action supprimera définitivement les données de production de test pour ${label}, toutes les dates et tous les shifts. Les comptes, rôles, objectifs et paramètres seront conservés. Continuer ?`);
+ if(!ok)return;
+ const typed=prompt(`Pour confirmer la suppression, saisissez exactement : SUPPRIMER`);
+ if(typed!=="SUPPRIMER"){msg("resetTestStatus","Opération annulée. Aucune donnée n’a été supprimée.");return}
+ const btn=$("resetTestDataBtn");btn.disabled=true;msg("resetTestStatus","Suppression en cours… Ne fermez pas l’application.");
+ try{
+  let deletedLines=0;
+  for(const line of lines){
+   const {error:prodError}=await db.from("production_records").delete().eq("ligne",line);
+   if(prodError)throw new Error(`Erreur pour ${line} : ${prodError.message}`);
+   const {error:claimError}=await db.from("line_shift_claims").delete().eq("ligne",line);
+   if(claimError)throw new Error(`Données de réservation non réinitialisées pour ${line} : ${claimError.message}`);
+   deletedLines++;
+  }
+  dashboardRows=dashboardRows.filter(r=>!lines.includes(r.ligne));
+  renderDashboard();
+  await loadCassePage();
+  msg("resetTestStatus",`Réinitialisation terminée ✓ ${deletedLines} ligne(s) traitée(s). Les comptes, rôles, objectifs et paramètres sont conservés.`);
+ }catch(e){
+  msg("resetTestStatus","Réinitialisation partielle ou impossible : "+e.message+". Vérifiez les droits DELETE (Admin) dans Supabase avant de recommencer.");
+ }finally{btn.disabled=false}
+}
+
+function showPage(id){
+ const pages=["lineHome","productionArea","dashboardArea","casseArea","excelArea","sopArea","adminArea"];
+ pages.forEach(pid=>{const el=$(pid);if(el)el.classList.toggle("hidden",pid!==id)});
+ if(id==="dashboardArea")loadDashboard();
+ if(id==="casseArea")loadCassePage();
+ if(id==="sopArea")loadSopOrders();
+ if(id==="adminArea"&&canManageUsers)loadUsers();
+ if(id==="excelArea"){msg("excelStatus","Prêt. Les données enregistrées seront récupérées directement depuis Supabase au moment de l’export.");}
+}
+document.querySelectorAll("[data-page]").forEach(b=>b.addEventListener("click",()=>{
+ const target=b.dataset.page;
+ if(target==="lineHome"&&!isViewer){$("productionArea").classList.add("hidden");$("dashboardArea").classList.add("hidden");$("excelArea").classList.add("hidden");$("casseArea").classList.add("hidden");$("lineHome").classList.remove("hidden");return}
+ if(target==="productionArea"&&!isViewer){if(!selectedLine()){alert("Choisissez d'abord une ligne.");return}}
+ if(target==="casseArea"){showPage("casseArea");return}
+ if(target==="adminArea"&&!canManageUsers){alert("Accès réservé aux administrateurs.");return}
+ if(target==="excelArea"&&!dashboardRows.length){loadDashboard().then(()=>showPage("excelArea"));return}
+ showPage(target);
+}));
+$("excelExportBtn").onclick=exportDashboard;
+$("resetTestDataBtn").onclick=resetTestProductionData;
+$("excelBackBtn").onclick=()=>showPage("dashboardArea");
+$("dashRefreshBtn").onclick=loadDashboard;$("casseRefreshBtn").onclick=loadCassePage;$("casseDate").onchange=loadCassePage;
+$("saveDailyTargetBtn").onclick=saveDailyTarget;
+$("exportExcelBtn").onclick=exportDashboard;
+$("dashLine").onchange=()=>{refreshDashboardFormats();renderDashboard()};
+$("dashFormat").onchange=()=>renderDashboard();
+// S&OP – demandes partagées via Supabase
+const SOP_CREATE_ROLES=["admin","assistant_admin","sop"];
+const SOP_UPDATE_ROLES=["admin","assistant_admin","sop","chef"];
+function canCreateSop(){return SOP_CREATE_ROLES.includes(currentRole)}
+function initSop(){
+ const lineOptions=LINES.map(l=>`<option value="${esc(l)}">${esc(l)}</option>`).join("");
+ $("sopLine").innerHTML=lineOptions;$("sopFilterLine").innerHTML='<option value="">Toutes les lignes</option>'+lineOptions;
+ $("sopDate").value=today();$("sopFilterDate").value=today();
+ $("sopCreatePanel").classList.toggle("hidden",!canCreateSop());
+ $("sopCreateBtn").disabled=!canCreateSop();
+}
+async function createSopOrder(){
+ if(!canCreateSop()){msg("sopCreateStatus","Création réservée aux rôles S&OP et administrateurs.");return}
+ const date=$("sopDate").value,line=$("sopLine").value,product=$("sopProduct").value.trim(),request=$("sopRequest").value.trim(),qty=Math.max(0,Number($("sopQty").value)||0);
+ if(!date||!line||(!product&&!request)){msg("sopCreateStatus","Saisissez la date, la ligne et le produit ou la demande.");return}
+ msg("sopCreateStatus","Enregistrement en cours...");
+ const payload={order_date:date,ligne:line,format:$("sopFormat").value.trim()||null,article:product||null,shift:$("sopShift").value||null,objective:qty||null,description:request||null,status:"Non réalisé",created_by:currentUser.id};
+ const {error}=await db.from("sop_orders").insert(payload);
+ if(error){msg("sopCreateStatus","Erreur: "+error.message+" — Vérifiez le SQL S&OP dans Supabase.");return}
+ msg("sopCreateStatus","Demande enregistrée ✓");$("sopProduct").value="";$("sopFormat").value="";$("sopQty").value="";$("sopRequest").value="";await loadSopOrders();
+}
+async function updateSopStatus(id,status){
+ if(!SOP_UPDATE_ROLES.includes(currentRole)){alert("Vous n'avez pas l'autorisation de modifier l'état.");return}
+ const {error}=await db.from("sop_orders").update({status,updated_at:new Date().toISOString()}).eq("id",id);
+ if(error){msg("sopStatus","Erreur de mise à jour: "+error.message);return}await loadSopOrders();
+}
+async function loadSopOrders(){
+ if(!currentUser)return;msg("sopStatus","Chargement des demandes...");
+ let q=db.from("sop_orders").select("id,order_date,ligne,format,article,shift,objective,description,status,created_at").order("order_date",{ascending:false}).order("created_at",{ascending:false}).limit(1000);
+ if($("sopFilterDate").value)q=q.eq("order_date",$("sopFilterDate").value);
+ if($("sopFilterLine").value)q=q.eq("ligne",$("sopFilterLine").value);
+ if($("sopFilterStatus").value)q=q.eq("status",$("sopFilterStatus").value);
+ const {data,error}=await q;
+ if(error){$("sopOrders").innerHTML="";msg("sopStatus","Erreur S&OP: "+error.message+". Vérifiez le script SQL.");return}
+ const rows=data||[];msg("sopStatus",rows.length+" demande(s) chargée(s).");
+ const canUpdate=SOP_UPDATE_ROLES.includes(currentRole);
+ $("sopOrders").innerHTML=`<table><thead><tr><th>Date</th><th>Ligne</th><th>Format / Produit</th><th>Shift</th><th>Quantité</th><th>Demande</th><th>État</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.order_date)}</td><td>${esc(r.ligne)}</td><td>${esc([r.format,r.article].filter(Boolean).join(" / "))}</td><td>${esc(r.shift||"Tous")}</td><td>${r.objective==null?"—":fmt(r.objective)}</td><td>${esc(r.description||"—")}</td><td>${canUpdate?`<select data-sop-id="${esc(r.id)}"><option ${r.status==="Non réalisé"?"selected":""}>Non réalisé</option><option ${r.status==="Partiellement terminé"?"selected":""}>Partiellement terminé</option><option ${r.status==="Terminé"?"selected":""}>Terminé</option></select>`:esc(r.status)}</td></tr>`).join("")||'<tr><td colspan="7">Aucune demande</td></tr>'}</tbody></table>`;
+ $("sopOrders").querySelectorAll("select[data-sop-id]").forEach(sel=>sel.addEventListener("change",()=>updateSopStatus(sel.dataset.sopId,sel.value)));
+}
+$("sopCreateBtn").onclick=createSopOrder;$("sopRefreshBtn").onclick=loadSopOrders;
+["sopFilterDate","sopFilterLine","sopFilterStatus"].forEach(id=>$(id).addEventListener("change",loadSopOrders));
+$("date").value=today();setupFields();$("shiftTime").textContent="Horaires: "+SHIFT_HOURS[$("shift").value];
+initDashboardFilters();
+$("dashLine").value="";
+connectExisting().then(()=>{if(currentUser)loadDashboard()}).catch(e=>msg("authStatus","Erreur: "+e.message));
+</script>
+</body></html>
