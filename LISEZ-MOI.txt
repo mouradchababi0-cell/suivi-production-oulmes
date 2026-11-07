@@ -1,0 +1,40 @@
+SUIVI PRODUCTION OULMES — VERSION DE PRÉPARATION ANDROID + WINDOWS
+
+Cette version conserve l'application V20 (assets/index.html) et ajoute :
+- une icône de l'application liée à l'eau et à la production ;
+- une configuration Expo pour Android ;
+- un lanceur Windows Electron et une configuration de création d'installateur EXE.
+
+IMPORTANT : ce dossier est un projet source prêt à tester/construire, pas encore les fichiers APK/EXE finaux.
+L'application utilise Supabase en ligne et les bibliothèques CDN présentes dans la page HTML ; une connexion Internet est nécessaire.
+Les accès et les fonctions (connexion, enregistrement, exports) doivent être testés avant distribution.
+
+WINDOWS 10/11
+1. Installer Node.js LTS depuis https://nodejs.org
+2. Extraire le ZIP dans un dossier, par exemple Documents\SuiviProductionOulmes
+3. Ouvrir ce dossier dans VS Code.
+4. Ouvrir Terminal > Nouveau terminal.
+5. Exécuter : npm install
+6. Tester l'application : npm run desktop
+7. Créer l'installateur Windows : npm run build:windows
+8. Le fichier d'installation sera créé dans le dossier dist. L'installateur crée un raccourci sur le Bureau.
+
+ANDROID APK
+1. Installer Node.js LTS et Git, puis ouvrir le dossier du projet dans VS Code.
+2. Exécuter : npm install
+3. Installer EAS : npm install -g eas-cli
+4. Se connecter : eas login
+5. Construire l'APK : eas build -p android --profile preview
+6. Télécharger l'APK depuis le lien fourni par Expo/EAS.
+
+Le build Android se fait via le service cloud Expo. Le build Windows doit être produit sur Windows pour obtenir l'installateur NSIS final.
+
+À VALIDER AVANT MISE EN SERVICE
+- Connexion Supabase et rôles utilisateurs ;
+- création/modification des enregistrements ;
+- synchronisation entre plusieurs appareils ;
+- affichage responsive ;
+- export Excel et téléchargement ;
+- sauvegarde et droits d'accès.
+
+Note de marque : l'icône est un concept graphique indépendant. Pour une diffusion officielle, utiliser uniquement les logos et éléments de marque Oulmès autorisés par l'entreprise.

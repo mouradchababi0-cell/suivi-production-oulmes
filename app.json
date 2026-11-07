@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "name": "Suivi Production Oulmès",
+    "slug": "suivi-production-oulmes",
+    "version": "1.1.0",
+    "orientation": "default",
+    "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
+    "android": {
+      "package": "com.oulmes.suiviproduction",
+      "versionCode": 2,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#075985"
+      }
+    }
+  }
+}
